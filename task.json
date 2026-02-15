@@ -83,19 +83,19 @@
       "name": "Build and test on Windows",
       "priority": 8,
       "passes": false,
-      "blocked": false,
+      "blocked": true,
       "depends_on": [
         "T005",
         "T006",
         "T007"
       ],
-      "notes": "Compile with Lazarus, run integration tests"
+      "notes": "Compile with Lazarus, run integration tests [BLOCKED: Windows Lazarus/FPC toolchain unavailable in current environment]"
     },
     {
       "id": "T009",
       "name": "Create user documentation",
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "blocked": false,
       "depends_on": [
         "T008"

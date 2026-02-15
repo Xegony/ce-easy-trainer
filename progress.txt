@@ -14,3 +14,5 @@
 [2026-02-16T03:45:00+08:00] R006 | T005 | PASS | Added EasyTrainerMainUnit skeleton for one-click trainer flow
 [2026-02-16T03:46:00+08:00] R007 | T006 | PASS | Added CTEasyCompatibilityUnit for optional CT extension metadata
 [2026-02-16T03:47:00+08:00] R008 | T007 | PASS | Added AutoReattachUnit background reattach service skeleton
+[2026-02-16T03:50:00+08:00] R009 | T008 | BLOCKED | Windows Lazarus/FPC unavailable in current Linux container; wrote build-test-status.md
+[2026-02-16T03:51:00+08:00] R010 | T009 | PASS | Created quick-start documentation and compatibility notes
