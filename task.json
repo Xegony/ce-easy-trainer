@@ -37,7 +37,7 @@
       "id": "T004",
       "name": "Implement auto-address-persistence engine",
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "blocked": false,
       "depends_on": [
         "T002"
