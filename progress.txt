@@ -11,3 +11,6 @@
 [2026-02-16T03:31:00+08:00] R003 | T002 | PASS | Identified and documented key modification modules for UI/memrec/CT/trainer pipeline
 [2026-02-16T03:34:00+08:00] R004 | T003 | PASS | Designed one-click simplified UI architecture in docs/ui-architecture.md
 [2026-02-16T03:38:00+08:00] R005 | T004 | PASS | Implemented SmartPersistenceUnit with strategy scoring (pointer/AOB/module/hybrid)
+[2026-02-16T03:45:00+08:00] R006 | T005 | PASS | Added EasyTrainerMainUnit skeleton for one-click trainer flow
+[2026-02-16T03:46:00+08:00] R007 | T006 | PASS | Added CTEasyCompatibilityUnit for optional CT extension metadata
+[2026-02-16T03:47:00+08:00] R008 | T007 | PASS | Added AutoReattachUnit background reattach service skeleton

@@ -48,7 +48,7 @@
       "id": "T005",
       "name": "Build simplified main interface",
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "blocked": false,
       "depends_on": [
         "T003"
@@ -59,7 +59,7 @@
       "id": "T006",
       "name": "Integrate CT table format support",
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "blocked": false,
       "depends_on": [
         "T004",
@@ -71,7 +71,7 @@
       "id": "T007",
       "name": "Add auto-reattach on game restart",
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "blocked": false,
       "depends_on": [
         "T004"
