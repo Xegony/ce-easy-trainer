@@ -72,11 +72,18 @@ type
     Value: Int64;
     ValueType: Integer;  // 0=int, 1=float, 2=double
     Frozen: Boolean;
-    
-    // Persistence
+
+    // Persistence (module+offset)
     ModuleName: string;
     ModuleOffset: PtrUInt;
     UseModuleOffset: Boolean;
+
+    // Pointer mode (auto-found)
+    UsePointer: Boolean;
+    PointerAddress: PtrUInt;          // absolute pointer address fallback
+    PointerModuleName: string;        // pointer address module
+    PointerModuleOffset: PtrUInt;     // pointer addr = moduleBase + offset
+    PointerOffset: PtrInt;            // final = [pointerAddr] + PointerOffset
   end;
 
   // Module info
@@ -351,6 +358,63 @@ begin
     WriteLn(Format('Found %d candidate pointer(s).', [found]));
 end;
 
+function FindFirstPointerToAddress(TargetAddress: PtrUInt; out PointerAddress: PtrUInt): Boolean;
+var
+  mbi: MEMORY_BASIC_INFORMATION;
+  scanAddr, regionBase, regionSize, offset: PtrUInt;
+  chunkSize, toRead: NativeUInt;
+  bytesRead: NativeUInt;
+  buf: array of Byte;
+  i: NativeUInt;
+  pval: PtrUInt;
+begin
+  Result := False;
+  PointerAddress := 0;
+  if ProcessHandle = 0 then Exit;
+
+  scanAddr := 0;
+  chunkSize := 65536;
+
+  while (scanAddr < High(PtrUInt)) and
+        (VirtualQueryEx(ProcessHandle, Pointer(scanAddr), mbi, SizeOf(mbi)) = SizeOf(mbi)) do
+  begin
+    regionBase := PtrUInt(mbi.BaseAddress);
+    regionSize := mbi.RegionSize;
+
+    if (mbi.State = MEM_COMMIT) and IsReadableProtect(mbi.Protect) then
+    begin
+      offset := 0;
+      while offset < regionSize do
+      begin
+        toRead := chunkSize;
+        if offset + toRead > regionSize then toRead := regionSize - offset;
+
+        SetLength(buf, toRead);
+        if Windows.ReadProcessMemory(ProcessHandle, Pointer(regionBase + offset), @buf[0], toRead, bytesRead) and
+           (bytesRead >= SizeOf(PtrUInt)) then
+        begin
+          i := 0;
+          while i + SizeOf(PtrUInt) <= bytesRead do
+          begin
+            Move(buf[i], pval, SizeOf(PtrUInt));
+            if pval = TargetAddress then
+            begin
+              PointerAddress := regionBase + offset + i;
+              Exit(True);
+            end;
+            Inc(i, SizeOf(PtrUInt));
+          end;
+        end;
+
+        Inc(offset, toRead);
+      end;
+    end;
+
+    if regionBase + regionSize <= scanAddr then Break;
+    scanAddr := regionBase + regionSize;
+  end;
+end;
+
 // Write memory
 function WriteMem(Address: PtrUInt; Size: Integer; const Data): Boolean;
 var
@@ -410,7 +474,30 @@ end;
 function ResolveAddress(Entry: PMemEntry): PtrUInt;
 var
   ModuleBase: PtrUInt;
+  PointerAddr: PtrUInt;
+  PointerValue: PtrUInt;
 begin
+  // Pointer mode first: final = [pointerAddr] + PointerOffset
+  if Entry^.UsePointer then
+  begin
+    if (Entry^.PointerModuleName <> '') then
+    begin
+      ModuleBase := GetModuleBase(Entry^.PointerModuleName);
+      if ModuleBase > 0 then
+        PointerAddr := ModuleBase + Entry^.PointerModuleOffset
+      else
+        PointerAddr := Entry^.PointerAddress;
+    end
+    else
+      PointerAddr := Entry^.PointerAddress;
+
+    PointerValue := 0;
+    if (PointerAddr > 0) and ReadMem(PointerAddr, SizeOf(PtrUInt), PointerValue) then
+      Exit(PtrUInt(PtrInt(PointerValue) + Entry^.PointerOffset))
+    else
+      Exit(0);
+  end;
+
   if Entry^.UseModuleOffset and (Entry^.ModuleName <> '') then
   begin
     ModuleBase := GetModuleBase(Entry^.ModuleName);
@@ -516,6 +603,11 @@ begin
   Entry^.ValueType := 0; // int
   Entry^.Frozen := True;
   Entry^.UseModuleOffset := False;
+  Entry^.UsePointer := False;
+  Entry^.PointerAddress := 0;
+  Entry^.PointerModuleName := '';
+  Entry^.PointerModuleOffset := 0;
+  Entry^.PointerOffset := 0;
   
   // Get persistence info
   UpdatePersistence(Entry);
@@ -550,6 +642,13 @@ begin
       WriteLn(f, '      <ModuleName>' + Entry^.ModuleName + '</ModuleName>');
       WriteLn(f, '      <Offset>' + IntToHex(Entry^.ModuleOffset, 8) + '</Offset>');
     end;
+
+    if Entry^.UsePointer then
+    begin
+      WriteLn(f, '      <Extensions>');
+      WriteLn(f, '        <CEEasyPointer Module="' + Entry^.PointerModuleName + '" ModuleOffset="' + IntToHex(Entry^.PointerModuleOffset, 8) + '" Offset="' + IntToStr(Entry^.PointerOffset) + '"/>');
+      WriteLn(f, '      </Extensions>');
+    end;
     
     WriteLn(f, '    </CheatEntry>');
   end;
@@ -559,6 +658,116 @@ begin
   
   CloseFile(f);
   WriteLn('Table saved to: ' + Filename);
+end;
+
+function ExtractTagValue(const Line, Tag: string): string;
+var
+  a,b: Integer;
+  openTag, closeTag: string;
+begin
+  Result := '';
+  openTag := '<' + Tag + '>';
+  closeTag := '</' + Tag + '>';
+  a := Pos(openTag, Line);
+  b := Pos(closeTag, Line);
+  if (a>0) and (b>a) then
+    Result := Copy(Line, a + Length(openTag), b - (a + Length(openTag)));
+end;
+
+procedure LoadTable(const Filename: string);
+var
+  sl: TStringList;
+  i: Integer;
+  line, v: string;
+  Entry: PMemEntry;
+  inEntry: Boolean;
+  function Attr(const s, key: string): string;
+  var p, q: Integer;
+  begin
+    Result := '';
+    p := Pos(key + '="', s);
+    if p>0 then
+    begin
+      p := p + Length(key) + 2;
+      q := p;
+      while (q<=Length(s)) and (s[q] <> '"') do Inc(q);
+      Result := Copy(s, p, q-p);
+    end;
+  end;
+begin
+  if not FileExists(Filename) then
+  begin
+    WriteLn('Table not found: ' + Filename);
+    Exit;
+  end;
+
+  // clear old
+  for i := Entries.Count-1 downto 0 do
+  begin
+    Dispose(PMemEntry(Entries[i]));
+    Entries.Delete(i);
+  end;
+
+  sl := TStringList.Create;
+  try
+    sl.LoadFromFile(Filename);
+    inEntry := False;
+    Entry := nil;
+
+    for i := 0 to sl.Count-1 do
+    begin
+      line := Trim(sl[i]);
+      if line = '<CheatEntry>' then
+      begin
+        New(Entry);
+        FillChar(Entry^, SizeOf(TMemEntry), 0);
+        Entry^.ValueType := 0;
+        Entry^.Frozen := True;
+        inEntry := True;
+        Continue;
+      end;
+
+      if line = '</CheatEntry>' then
+      begin
+        if inEntry and (Entry<>nil) then
+          Entries.Add(Entry);
+        inEntry := False;
+        Entry := nil;
+        Continue;
+      end;
+
+      if not inEntry or (Entry=nil) then Continue;
+
+      v := ExtractTagValue(line, 'Description');
+      if v <> '' then
+      begin
+        if (Length(v)>=2) and (v[1]='"') and (v[Length(v)]='"') then
+          v := Copy(v,2,Length(v)-2);
+        Entry^.Description := v;
+      end;
+
+      v := ExtractTagValue(line, 'Address');
+      if v <> '' then Entry^.Address := StrToQWordDef('$'+v, 0);
+
+      v := ExtractTagValue(line, 'ModuleName');
+      if v <> '' then begin Entry^.ModuleName := v; Entry^.UseModuleOffset := True; end;
+
+      v := ExtractTagValue(line, 'Offset');
+      if v <> '' then begin Entry^.ModuleOffset := StrToQWordDef('$'+v, 0); Entry^.UseModuleOffset := True; end;
+
+      if Pos('<CEEasyPointer ', line) > 0 then
+      begin
+        Entry^.UsePointer := True;
+        Entry^.PointerModuleName := Attr(line, 'Module');
+        Entry^.PointerModuleOffset := StrToQWordDef('$'+Attr(line, 'ModuleOffset'), 0);
+        Entry^.PointerOffset := StrToIntDef(Attr(line, 'Offset'), 0);
+      end;
+    end;
+
+    WriteLn(Format('Loaded %d entries from %s', [Entries.Count, Filename]));
+  finally
+    sl.Free;
+  end;
 end;
 
 // Interactive menu
@@ -581,6 +790,7 @@ begin
   WriteLn('6. Save table');
   WriteLn('7. Auto-reattach test');
   WriteLn('8. Auto find pointers for an entry');
+  WriteLn('9. Load table');
   WriteLn('0. Exit');
   WriteLn('');
   Write('Choice: ');
@@ -599,7 +809,9 @@ begin
     WriteLn(Format('[%d] %s', [i+1, Entry^.Description]));
     WriteLn(Format('    Address: $%X', [Entry^.Address]));
     WriteLn(Format('    Value: %d', [Entry^.Value]));
-    if Entry^.UseModuleOffset then
+    if Entry^.UsePointer then
+      WriteLn(Format('    Pointer: [%s+$%X] + %d', [Entry^.PointerModuleName, Entry^.PointerModuleOffset, Entry^.PointerOffset]))
+    else if Entry^.UseModuleOffset then
       WriteLn(Format('    Persistence: %s + $%X', [Entry^.ModuleName, Entry^.ModuleOffset]));
   end;
   WriteLn('');
@@ -610,7 +822,8 @@ var
   idx: Integer;
   s: string;
   Entry: PMemEntry;
-  target: PtrUInt;
+  target, ptrAddr, moduleBase: PtrUInt;
+  mname: string;
 begin
   if Entries.Count = 0 then
   begin
@@ -636,7 +849,34 @@ begin
     Exit;
   end;
 
-  FindPointersToAddress(target, 50);
+  // print candidates first
+  FindPointersToAddress(target, 20);
+
+  // auto-pick first and switch to pointer mode
+  if FindFirstPointerToAddress(target, ptrAddr) then
+  begin
+    Entry^.UsePointer := True;
+    Entry^.PointerAddress := ptrAddr;
+    Entry^.PointerOffset := 0;
+
+    mname := FindModuleForAddress(ptrAddr);
+    Entry^.PointerModuleName := mname;
+    if mname <> '' then
+    begin
+      moduleBase := GetModuleBase(mname);
+      Entry^.PointerModuleOffset := ptrAddr - moduleBase;
+      WriteLn(Format('Auto pointer selected: [%s+$%X] + %d', [mname, Entry^.PointerModuleOffset, Entry^.PointerOffset]));
+    end
+    else
+    begin
+      Entry^.PointerModuleOffset := 0;
+      WriteLn(Format('Auto pointer selected: [$%X] + %d', [ptrAddr, Entry^.PointerOffset]));
+    end;
+
+    WriteLn('Entry switched to POINTER mode. Next restart will resolve by pointer automatically.');
+  end
+  else
+    WriteLn('Auto pointer not found, keep original mode.');
 end;
 
 procedure TestAutoReattach;
@@ -730,6 +970,12 @@ begin
         7: TestAutoReattach;
 
         8: AutoFindPointersForEntry;
+
+        9: begin
+          Write('Filename: ');
+          ReadLn(input);
+          LoadTable(input);
+        end;
         
         0: begin
           WriteLn('Bye!');
