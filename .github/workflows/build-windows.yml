@@ -31,34 +31,53 @@ jobs:
           exit 1
         }
 
-    - name: Build with lazbuild
+    - name: Build Console Version
       shell: powershell
       run: |
         $lazbuild = "C:\lazarus\lazbuild.exe"
         if (!(Test-Path $lazbuild)) {
           $lazbuild = (Get-Command lazbuild -ErrorAction SilentlyContinue).Source
         }
-        if (!(Test-Path $lazbuild)) {
-          Write-Host "lazbuild not found"
-          exit 1
-        }
         Write-Host "Using lazbuild: $lazbuild"
 
         New-Item -ItemType Directory -Force -Path bin | Out-Null
+        
+        # Build console version
         & $lazbuild CEEasyTrainer.lpi -B 2>&1
         if ($LASTEXITCODE -ne 0) {
-          Write-Host "Build failed with exit code: $LASTEXITCODE"
+          Write-Host "Console build failed"
+        }
+
+    - name: Build GUI Version
+      shell: powershell
+      run: |
+        $lazbuild = "C:\lazarus\lazbuild.exe"
+        
+        # Build GUI version
+        & $lazbuild CEEasyTrainerGUI.lpi -B 2>&1
+        if ($LASTEXITCODE -ne 0) {
+          Write-Host "GUI build failed with exit code: $LASTEXITCODE"
           exit 1
         }
 
-    - name: Verify build
+    - name: Verify builds
       shell: powershell
       run: |
-        if (Test-Path bin\CEEasyTrainer.exe) {
+        $hasConsole = Test-Path bin\CEEasyTrainer.exe
+        $hasGUI = Test-Path bin\CEEasyTrainerGUI.exe
+        
+        if ($hasConsole) {
           $size = (Get-Item bin\CEEasyTrainer.exe).Length / 1KB
-          Write-Host "Build SUCCESS - exe size: $([math]::Round($size, 2)) KB"
-        } else {
-          Write-Host "Build FAILED - exe not found"
+          Write-Host "Console: $([math]::Round($size, 2)) KB"
+        }
+        
+        if ($hasGUI) {
+          $size = (Get-Item bin\CEEasyTrainerGUI.exe).Length / 1KB
+          Write-Host "GUI: $([math]::Round($size, 2)) KB"
+        }
+        
+        if (-not $hasGUI) {
+          Write-Host "GUI build FAILED"
           exit 1
         }
 
@@ -66,7 +85,8 @@ jobs:
       shell: powershell
       run: |
         New-Item -ItemType Directory -Force -Path release | Out-Null
-        Copy-Item bin\CEEasyTrainer.exe release\
+        if (Test-Path bin\CEEasyTrainer.exe) { Copy-Item bin\CEEasyTrainer.exe release\ }
+        if (Test-Path bin\CEEasyTrainerGUI.exe) { Copy-Item bin\CEEasyTrainerGUI.exe release\ }
         Copy-Item README.md release\ -ErrorAction SilentlyContinue
 
     - name: Create artifact
