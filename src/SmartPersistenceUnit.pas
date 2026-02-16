@@ -113,28 +113,43 @@ var
   i: Integer;
   entry: PSmartEntry;
 begin
-  AssignFile(f, Filename);
-  Rewrite(f);
-  
-  WriteLn(f, '[SmartTable v1.0]');
-  WriteLn(f, 'Count=', Entries.Count);
-  WriteLn(f, '');
-  
-  for i := 0 to Entries.Count - 1 do
-  begin
-    entry := PSmartEntry(Entries[i]);
-    WriteLn(f, '[Entry', i, ']');
-    WriteLn(f, 'Description=', entry^.Description);
-    WriteLn(f, 'OriginalAddress=', IntToHex(entry^.OriginalAddress, 8));
-    WriteLn(f, 'Value=', entry^.Value);
-    WriteLn(f, 'ValueType=', entry^.ValueType);
-    WriteLn(f, 'AutoReapply=', BoolToStr(entry^.AutoReapply, True));
-    WriteLn(f, 'PersistenceMethod=', Ord(entry^.Persistence.Method));
-    WriteLn(f, 'Confidence=', FloatToStrF(entry^.Persistence.Confidence, ffFixed, 2, 2));
+  try
+    AssignFile(f, Filename);
+    {$I-}
+    Rewrite(f);
+    {$I+}
+    if IOResult <> 0 then
+    begin
+      WriteLn('Warning: Cannot create file ', Filename);
+      Exit;
+    end;
+    
+    WriteLn(f, '[SmartTable v1.0]');
+    WriteLn(f, 'Count=', Entries.Count);
     WriteLn(f, '');
+    
+    for i := 0 to Entries.Count - 1 do
+    begin
+      entry := PSmartEntry(Entries[i]);
+      WriteLn(f, '[Entry', i, ']');
+      WriteLn(f, 'Description=', entry^.Description);
+      WriteLn(f, 'OriginalAddress=', IntToHex(entry^.OriginalAddress, 8));
+      WriteLn(f, 'Value=', entry^.Value);
+      WriteLn(f, 'ValueType=', entry^.ValueType);
+      WriteLn(f, 'AutoReapply=', BoolToStr(entry^.AutoReapply, True));
+      WriteLn(f, 'PersistenceMethod=', Ord(entry^.Persistence.Method));
+      WriteLn(f, 'Confidence=', FloatToStrF(entry^.Persistence.Confidence, ffFixed, 2, 2));
+      WriteLn(f, '');
+    end;
+    
+    CloseFile(f);
+  except
+    on E: Exception do
+    begin
+      WriteLn('Warning: Failed to save table - ', E.Message);
+      WriteLn('Continuing without saving...');
+    end;
   end;
-  
-  CloseFile(f);
 end;
 
 procedure LoadSmartTable(Filename: String; Entries: TList);
@@ -166,52 +181,69 @@ begin
     Dispose(PSmartEntry(Entries[i]));
   Entries.Clear;
   
-  if not FileExists(Filename) then Exit;
-  
-  AssignFile(f, Filename);
-  Reset(f);
-  
-  entry := nil;
-  while not EOF(f) do
+  if not FileExists(Filename) then
   begin
-    ReadLn(f, line);
-    line := Trim(line);
-    
-    if (line = '') or (line[1] = ';') or (line[1] = '#') then Continue;
-    
-    if (line[1] = '[') then
-    begin
-      // New section
-      if (Pos('[Entry', line) = 1) then
-      begin
-        New(entry);
-        entry^.OriginalAddress := 0;
-        entry^.Value := 0;
-        entry^.ValueType := 0;
-        entry^.AutoReapply := True;
-        entry^.Persistence.Method := pmNone;
-        entry^.Persistence.Confidence := 0;
-        Entries.Add(entry);
-      end;
-    end
-    else if entry <> nil then
-    begin
-      ParseLine(line, key, value);
-      
-      if key = 'Description' then entry^.Description := value
-      else if key = 'OriginalAddress' then entry^.OriginalAddress := StrToIntDef('$' + value, 0)
-      else if key = 'Value' then entry^.Value := StrToInt64Def(value, 0)
-      else if key = 'ValueType' then entry^.ValueType := StrToIntDef(value, 0)
-      else if key = 'AutoReapply' then entry^.AutoReapply := (LowerCase(value) = 'true')
-      else if key = 'PersistenceMethod' then entry^.Persistence.Method := TPersistenceMethod(StrToIntDef(value, 0))
-      else if key = 'Confidence' then entry^.Persistence.Confidence := StrToFloatDef(value, 0)
-      else if key = 'ModuleName' then entry^.Persistence.ModuleName := value
-      else if key = 'ModuleOffset' then entry^.Persistence.ModuleOffset := StrToInt64Def('$' + value, 0)
-      else if key = 'AOBSignature' then entry^.Persistence.AOBSignature := value;
-    end;
+    WriteLn('Warning: File not found - ', Filename);
+    Exit;
   end;
   
-  CloseFile(f);
+  try
+    AssignFile(f, Filename);
+    {$I-}
+    Reset(f);
+    {$I+}
+    if IOResult <> 0 then
+    begin
+      WriteLn('Warning: Cannot open file ', Filename);
+      Exit;
+    end;
+    
+    entry := nil;
+    while not EOF(f) do
+    begin
+      ReadLn(f, line);
+      line := Trim(line);
+      
+      if (line = '') or (line[1] = ';') or (line[1] = '#') then Continue;
+      
+      if (line[1] = '[') then
+      begin
+        if (Pos('[Entry', line) = 1) then
+        begin
+          New(entry);
+          entry^.OriginalAddress := 0;
+          entry^.Value := 0;
+          entry^.ValueType := 0;
+          entry^.AutoReapply := True;
+          entry^.Persistence.Method := pmNone;
+          entry^.Persistence.Confidence := 0;
+          Entries.Add(entry);
+        end;
+      end
+      else if entry <> nil then
+      begin
+        ParseLine(line, key, value);
+        
+        if key = 'Description' then entry^.Description := value
+        else if key = 'OriginalAddress' then entry^.OriginalAddress := StrToQWordDef('$' + value, 0)
+        else if key = 'Value' then entry^.Value := StrToQWordDef(value, 0)
+        else if key = 'ValueType' then entry^.ValueType := StrToIntDef(value, 0)
+        else if key = 'AutoReapply' then entry^.AutoReapply := (LowerCase(value) = 'true')
+        else if key = 'PersistenceMethod' then entry^.Persistence.Method := TPersistenceMethod(StrToIntDef(value, 0))
+        else if key = 'Confidence' then entry^.Persistence.Confidence := StrToFloatDef(value, 0)
+        else if key = 'ModuleName' then entry^.Persistence.ModuleName := value
+        else if key = 'ModuleOffset' then entry^.Persistence.ModuleOffset := StrToQWordDef('$' + value, 0)
+        else if key = 'AOBSignature' then entry^.Persistence.AOBSignature := value;
+      end;
+    end;
+    
+    CloseFile(f);
+  except
+    on E: Exception do
+    begin
+      WriteLn('Warning: Failed to load table - ', E.Message);
+    end;
+  end;
 end;
 
 procedure AutoReapplyEntries(Entries: TList; ProcessName: String);
