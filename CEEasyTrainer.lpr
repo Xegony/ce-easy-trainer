@@ -23,6 +23,40 @@ uses
   SysUtils, Classes;
 
 const
+  TH32CS_SNAPPROCESS = $00000002;
+  TH32CS_SNAPMODULE = $00000008;
+  TH32CS_SNAPMODULE32 = $00000010;
+  MAX_MODULE_NAME32 = 255;
+  
+type
+  // Windows structures
+  TProcessEntry32 = record
+    dwSize: DWORD;
+    cntUsage: DWORD;
+    th32ProcessID: DWORD;
+    th32DefaultHeapID: ULONG_PTR;
+    th32ModuleID: DWORD;
+    cntThreads: DWORD;
+    th32ParentProcessID: DWORD;
+    pcPriClassBase: LONG;
+    dwFlags: DWORD;
+    szExeFile: array [0..MAX_PATH - 1] of AnsiChar;
+  end;
+  
+  TModuleEntry32 = record
+    dwSize: DWORD;
+    th32ModuleID: DWORD;
+    th32ProcessID: DWORD;
+    GlblcntUsage: DWORD;
+    ProccntUsage: DWORD;
+    modBaseAddr: PByte;
+    modBaseSize: DWORD;
+    hModule: HMODULE;
+    szModule: array [0..MAX_MODULE_NAME32] of AnsiChar;
+    szExePath: array [0..MAX_PATH - 1] of AnsiChar;
+  end;
+
+const
   PROCESS_VM_READ = $0010;
   PROCESS_VM_WRITE = $0020;
   PROCESS_VM_OPERATION = $0008;
@@ -321,6 +355,7 @@ var
   Entry: PMemEntry;
   Addr: PtrUInt;
   OldValue: Int64;
+  fValue: Single;
 begin
   if ProcessHandle = 0 then
   begin
@@ -349,7 +384,10 @@ begin
     // Write new value
     case Entry^.ValueType of
       0: WriteInt(Addr, Entry^.Value, 4);
-      1: WriteFloat(Addr, Single(Entry^.Value));
+      1: begin
+           fValue := Entry^.Value;
+           WriteFloat(Addr, fValue);
+         end;
       2: ; // double
     end;
     
