@@ -789,7 +789,7 @@ begin
   WriteLn('5. List entries');
   WriteLn('6. Save table');
   WriteLn('7. Auto-reattach test');
-  WriteLn('8. Auto find pointers for an entry');
+  WriteLn('8. Convert entry to pointer mode (auto)');
   WriteLn('9. Load table');
   WriteLn('0. Exit');
   WriteLn('');
@@ -849,10 +849,9 @@ begin
     Exit;
   end;
 
-  // print candidates first
-  FindPointersToAddress(target, 20);
+  WriteLn(Format('Scanning for pointers to $%X...', [target]));
 
-  // auto-pick first and switch to pointer mode
+  // auto-pick first valid pointer and switch to pointer mode
   if FindFirstPointerToAddress(target, ptrAddr) then
   begin
     Entry^.UsePointer := True;
@@ -865,18 +864,26 @@ begin
     begin
       moduleBase := GetModuleBase(mname);
       Entry^.PointerModuleOffset := ptrAddr - moduleBase;
-      WriteLn(Format('Auto pointer selected: [%s+$%X] + %d', [mname, Entry^.PointerModuleOffset, Entry^.PointerOffset]));
+      WriteLn('');
+      WriteLn(Format('✓ Found pointer: [%s+$%X] + 0', [mname, Entry^.PointerModuleOffset]));
     end
     else
     begin
       Entry^.PointerModuleOffset := 0;
-      WriteLn(Format('Auto pointer selected: [$%X] + %d', [ptrAddr, Entry^.PointerOffset]));
+      WriteLn('');
+      WriteLn(Format('✓ Found pointer: [$%X] + 0', [ptrAddr]));
     end;
 
-    WriteLn('Entry switched to POINTER mode. Next restart will resolve by pointer automatically.');
+    WriteLn('');
+    WriteLn('Entry converted to POINTER mode.');
+    WriteLn('After game restart, load table and apply - address will auto-resolve.');
   end
   else
-    WriteLn('Auto pointer not found, keep original mode.');
+  begin
+    WriteLn('');
+    WriteLn('✗ No pointer found for this address.');
+    WriteLn('  Entry keeps original mode.');
+  end;
 end;
 
 procedure TestAutoReattach;
