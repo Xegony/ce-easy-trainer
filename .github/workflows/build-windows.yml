@@ -21,22 +21,6 @@ jobs:
       run: |
         choco install lazarus -y
         
-    - name: Clone Cheat Engine source
-      shell: powershell
-      run: |
-        git clone --depth 1 https://github.com/cheat-engine/cheat-engine.git
-        
-    - name: Copy custom units
-      shell: powershell
-      run: |
-        Copy-Item src\*.pas "cheat-engine\Cheat Engine\" -Force
-        
-    - name: Debug - List files
-      shell: powershell
-      run: |
-        Get-ChildItem -Name | Select-Object -First 20
-        Get-ChildItem "cheat-engine\Cheat Engine" -Filter "*.pas" | Select-Object -First 10 Name
-        
     - name: Build
       shell: powershell
       run: |
@@ -44,22 +28,19 @@ jobs:
         if (!(Test-Path $lazbuild)) {
           $lazbuild = (Get-Command lazbuild -ErrorAction SilentlyContinue).Source
         }
-        if (!(Test-Path $lazbuild)) {
-          Write-Host "lazbuild not found"
-          exit 1
-        }
         Write-Host "Using lazbuild: $lazbuild"
-        & $lazbuild CheatEngineEasyTrainer.lpi -B 2>&1
+        & $lazbuild CEEasyTrainer.lpi -B 2>&1
         if ($LASTEXITCODE -ne 0) {
           Write-Host "Build failed with exit code: $LASTEXITCODE"
           exit 1
         }
         
-    - name: Check build output
+    - name: Verify build
       shell: powershell
       run: |
         if (Test-Path bin\CEEasyTrainer.exe) {
-          Write-Host "Build SUCCESS - exe found"
+          $size = (Get-Item bin\CEEasyTrainer.exe).Length / 1KB
+          Write-Host "Build SUCCESS - exe size: $([math]::Round($size, 2)) KB"
         } else {
           Write-Host "Build FAILED - exe not found"
           exit 1
@@ -69,9 +50,8 @@ jobs:
       shell: powershell
       run: |
         New-Item -ItemType Directory -Force -Path release
-        Copy-Item bin\CEEasyTrainer.exe release\ -ErrorAction SilentlyContinue
+        Copy-Item bin\CEEasyTrainer.exe release\
         Copy-Item README.md release\ -ErrorAction SilentlyContinue
-        Copy-Item docs release\ -Recurse -ErrorAction SilentlyContinue
         
     - name: Create artifact
       uses: actions/upload-artifact@v4
