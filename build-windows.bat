@@ -1,83 +1,67 @@
 @echo off
+REM ============================================================
 REM CE Easy Trainer - Windows Build Script
-REM Requires: Lazarus 2.2.2+ with FPC 3.2.2
+REM Requires: Lazarus 2.2+ with FPC 3.2.2
+REM ============================================================
 
-echo ============================================
+setlocal enabledelayedexpansion
+
+set PROJECT_ROOT=%~dp0
+set OUTPUT_DIR=%PROJECT_ROOT%build
+set BIN_DIR=%OUTPUT_DIR%\bin
+
+echo.
+echo ========================================
 echo   CE Easy Trainer - Windows Build
-echo ============================================
+echo ========================================
 echo.
 
-REM Set paths (adjust if needed)
-set LAZARUS_PATH=C:\lazarus
-set FPC_PATH=%LAZARUS_PATH%\fpc\3.2.2
-set PROJECT_ROOT=%~dp0
-
-echo Checking Lazarus installation...
-if not exist "%LAZARUS_PATH%\lazbuild.exe" (
-    echo ERROR: Lazarus not found at %LAZARUS_PATH%
-    echo Please install Lazarus 2.2.2 from:
-    echo https://sourceforge.net/projects/lazarus/files/Lazarus%20Windows%2064%20bits/Lazarus%202.2.2/
+REM Check for lazbuild
+where lazbuild >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] lazbuild not found in PATH
+    echo Please install Lazarus and add it to PATH
+    echo Download: https://sourceforge.net/projects/lazarus/
     pause
     exit /b 1
 )
 
-echo Found Lazarus at %LAZARUS_PATH%
+REM Create output directories
+if not exist "%OUTPUT_DIR%" mkdir "%OUTPUT_DIR%"
+if not exist "%BIN_DIR%" mkdir "%BIN_DIR%"
+if not exist "%OUTPUT_DIR%\lib" mkdir "%OUTPUT_DIR%\lib"
+
+echo [1/3] Cleaning previous build...
+del /q "%OUTPUT_DIR%\lib\*.*" 2>nul
+
+echo [2/3] Building CE Easy Trainer...
+cd /d "%PROJECT_ROOT%"
+lazbuild CheatEngineEasyTrainer.lpi -B --build-mode=Default
+
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Build failed!
+    echo Check the error messages above.
+    pause
+    exit /b 1
+)
+
 echo.
+echo [3/3] Copying output...
+if exist "bin\CEEasyTrainer.exe" (
+    copy /y "bin\CEEasyTrainer.exe" "%BIN_DIR%\" >nul
+    echo.
+    echo ========================================
+    echo   Build Successful!
+    ========================================
+    echo.
+    echo Output: %BIN_DIR%\CEEasyTrainer.exe
+    echo.
+) else (
+    echo [ERROR] Output file not found!
+    pause
+    exit /b 1
+)
 
-REM Step 1: Compile new units
-echo [Step 1/4] Compiling new units...
-cd "%PROJECT_ROOT%\cheat-engine\Cheat Engine"
-
-"%FPC_PATH%\bin\x86_64-win64\fpc.exe" -Mdelphi -B SmartPersistenceUnit.pas
-if errorlevel 1 goto :error
-
-"%FPC_PATH%\bin\x86_64-win64\fpc.exe" -Mdelphi -B EasyTrainerMainUnit.pas
-if errorlevel 1 goto :error
-
-"%FPC_PATH%\bin\x86_64-win64\fpc.exe" -Mdelphi -B AutoReattachUnit.pas
-if errorlevel 1 goto :error
-
-"%FPC_PATH%\bin\x86_64-win64\fpc.exe" -Mdelphi -B CTEasyCompatibilityUnit.pas
-if errorlevel 1 goto :error
-
-echo [OK] New units compiled
-echo.
-
-REM Step 2: Build main CE project
-echo [Step 2/4] Building Cheat Engine...
-"%LAZARUS_PATH%\lazbuild.exe" cheatengine.lpi --build-mode=Release
-if errorlevel 1 goto :error
-
-echo [OK] Cheat Engine built
-echo.
-
-REM Step 3: Create trainer
-echo [Step 3/4] Creating standalone trainer...
-REM This would invoke the trainer generator
-echo [OK] Trainer package ready
-echo.
-
-REM Step 4: Copy outputs
-echo [Step 4/4] Copying outputs...
-if not exist "%PROJECT_ROOT%\build" mkdir "%PROJECT_ROOT%\build"
-copy /Y "*.exe" "%PROJECT_ROOT%\build\"
-echo [OK] Outputs copied to build folder
-echo.
-
-echo ============================================
-echo   BUILD SUCCESSFUL!
-echo ============================================
-echo.
-echo Output: %PROJECT_ROOT%\build\
-echo.
-pause
-exit /b 0
-
-:error
-echo.
-echo ============================================
-echo   BUILD FAILED!
-echo ============================================
-echo Check the error messages above.
-pause
-exit /b 1
+echo Press any key to exit...
+pause >nul

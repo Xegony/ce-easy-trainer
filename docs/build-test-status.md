@@ -5,6 +5,15 @@
 
 ## 已完成的可执行检查
 - 新增单元文件结构与接口整理完成
+- 已落地核心单元并通过本地FPC编译与冒烟测试：
+  - `EasyTrainerMainUnit.pas`
+  - `CTEasyCompatibilityUnit.pas`
+  - `AutoReattachUnit.pas`
+  - `test_ce_easy_units.pas`（PASS）
+- 已完成 CE 集成适配层：
+  - `CEBackendAdapter.pas` — ITrainerBackend/IProcessProbe 实现
+  - `EasyTrainerIntegration.pas` — 初始化/清理示例
+  - `integration-guide.md` — 详细集成步骤
 - 任务级改动均已提交到git（项目仓库+CE子仓库）
 
 ## 待在Windows完成

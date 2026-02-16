@@ -26,3 +26,14 @@
 [2026-02-16T03:47:00+08:00] R008 | T007 | PASS | Added AutoReattachUnit background reattach service skeleton
 [2026-02-16T03:50:00+08:00] R009 | T008 | BLOCKED | Windows Lazarus/FPC unavailable in current Linux container; wrote build-test-status.md
 [2026-02-16T03:51:00+08:00] R010 | T009 | PASS | Created quick-start documentation and compatibility notes
+[2026-02-16T06:30:00+08:00] R012 | T005/T006/T007 | START | Enter execution phase for CE-compatible app core units
+[2026-02-16T06:34:00+08:00] R013 | T005 | PASS | Implemented EasyTrainerMainUnit state-machine controller with backend interface
+[2026-02-16T06:36:00+08:00] R014 | T006 | PASS | Implemented CTEasyCompatibilityUnit metadata inject/parse for Extensions/CEEasyTrainer
+[2026-02-16T06:38:00+08:00] R015 | T007 | PASS | Implemented AutoReattachUnit tick-based service with probe abstraction and callback throttling
+[2026-02-16T06:40:00+08:00] R016 | TEST | PASS | Added and passed smoke test (test_ce_easy_units.pas) via FPC 3.2.2
+[2026-02-16T08:10:00+08:00] R017 | INTEGRATION | START | Beginning CE integration adapter implementation
+[2026-02-16T08:15:00+08:00] R018 | ADAPTER | PASS | Created CEBackendAdapter.pas with ITrainerBackend + IProcessProbe implementations
+[2026-02-16T08:18:00+08:00] R019 | INTEGRATION | PASS | Created EasyTrainerIntegration.pas with initialization/cleanup demo
+[2026-02-16T08:20:00+08:00] R020 | DOCS | PASS | Created integration-guide.md with detailed step-by-step instructions
+[2026-02-16T08:25:00+08:00] R021 | BUILD | PASS | Created build-all.bat with clean/test/build targets
+[2026-02-16T08:28:00+08:00] R022 | DOCS | PASS | Created release-checklist.md with component status and quality assurance info
