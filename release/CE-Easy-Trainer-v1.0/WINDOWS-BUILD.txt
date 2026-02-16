@@ -1,0 +1,31 @@
+CE Easy Trainer - Windows 编译指南
+====================================
+
+前置要求：
+1. Lazarus 2.2.2 或更高版本（包含 FPC 3.2.2）
+   下载地址：https://sourceforge.net/projects/lazarus/
+
+2. Windows 64位系统
+
+编译步骤：
+1. 安装 Lazarus（确保选择 Win64 组件）
+
+2. 将 Cheat Engine 源码克隆到同级目录：
+   git clone https://github.com/cheat-engine/cheat-engine.git
+   
+3. 将 src/*.pas 复制到 cheat-engine/Cheat Engine/ 目录
+
+4. 用 Lazarus 打开 CheatEngineEasyTrainer.lpi
+
+5. 按 F9 或点击 运行 -> 编译
+
+如果遇到问题：
+- 确保所有依赖路径正确
+- 检查 Lazarus 版本兼容性
+- 查看 docs/ 目录中的详细文档
+
+功能说明：
+- 智能持久化：自动选择最佳内存地址定位策略
+- 自动重连：游戏重启后自动重新应用修改
+- CT表兼容：完全兼容 Cheat Engine 的 .CT 文件格式
+- 简化界面：一键式操作，去除复杂功能

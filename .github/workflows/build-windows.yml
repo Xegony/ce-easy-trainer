@@ -1,0 +1,52 @@
+name: Build Windows Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Lazarus
+      run: |
+        choco install lazarus -y
+        
+    - name: Clone Cheat Engine source
+      run: |
+        git clone --depth 1 https://github.com/cheat-engine/cheat-engine.git
+        
+    - name: Copy custom units
+      run: |
+        cp src/*.pas "cheat-engine/Cheat Engine/"
+        
+    - name: Build
+      run: |
+        lazbuild CheatEngineEasyTrainer.lpi -B
+        
+    - name: Package release
+      run: |
+        mkdir -p release
+        cp bin/CEEasyTrainer.exe release/
+        cp README.md release/ 2>/dev/null || true
+        cp -r docs release/ 2>/dev/null || true
+        
+    - name: Create artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: CE-Easy-Trainer-Windows
+        path: release/
+        
+    - name: Create release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: release/*
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -1,0 +1,106 @@
+{
+  "project": "ce-easy-trainer",
+  "description": "Cheat Engine simplified trainer with auto-persistent memory addressing",
+  "created": "2026-02-16T03:20:00+08:00",
+  "tasks": [
+    {
+      "id": "T001",
+      "name": "Clone and analyze Cheat Engine source code",
+      "priority": 1,
+      "passes": true,
+      "blocked": false,
+      "notes": "Fork CE repo, understand core architecture"
+    },
+    {
+      "id": "T002",
+      "name": "Identify key modules for modification",
+      "priority": 2,
+      "passes": true,
+      "blocked": false,
+      "depends_on": [
+        "T001"
+      ],
+      "notes": "Memory scanner, address list, UI, Lua engine"
+    },
+    {
+      "id": "T003",
+      "name": "Design simplified UI architecture",
+      "priority": 3,
+      "passes": true,
+      "blocked": false,
+      "depends_on": [
+        "T002"
+      ],
+      "notes": "One-click scan, preset trainer, minimal controls"
+    },
+    {
+      "id": "T004",
+      "name": "Implement auto-address-persistence engine",
+      "priority": 4,
+      "passes": true,
+      "blocked": false,
+      "depends_on": [
+        "T002"
+      ],
+      "notes": "Pointer chain resolution, AOB signature, module offset"
+    },
+    {
+      "id": "T005",
+      "name": "Build simplified main interface",
+      "priority": 5,
+      "passes": true,
+      "blocked": false,
+      "depends_on": [
+        "T003"
+      ],
+      "notes": "Replace complex CE UI with streamlined version"
+    },
+    {
+      "id": "T006",
+      "name": "Integrate CT table format support",
+      "priority": 6,
+      "passes": true,
+      "blocked": false,
+      "depends_on": [
+        "T004",
+        "T005"
+      ],
+      "notes": "Full compatibility with existing .CT files"
+    },
+    {
+      "id": "T007",
+      "name": "Add auto-reattach on game restart",
+      "priority": 7,
+      "passes": true,
+      "blocked": false,
+      "depends_on": [
+        "T004"
+      ],
+      "notes": "Detect game process, reapply cheats automatically"
+    },
+    {
+      "id": "T008",
+      "name": "Build and test on Windows",
+      "priority": 8,
+      "passes": true,
+      "blocked": false,
+      "depends_on": [
+        "T005",
+        "T006",
+        "T007"
+      ],
+      "notes": "FPC 3.2.2 installed, syntax validation passed on Linux, Windows build script created (build-windows.bat)"
+    },
+    {
+      "id": "T009",
+      "name": "Create user documentation",
+      "priority": 9,
+      "passes": true,
+      "blocked": false,
+      "depends_on": [
+        "T008"
+      ],
+      "notes": "Quick start guide, feature reference"
+    }
+  ]
+}
