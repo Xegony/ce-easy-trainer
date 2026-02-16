@@ -256,6 +256,101 @@ begin
   Result := Windows.ReadProcessMemory(ProcessHandle, Pointer(Address), @Data, Size, BytesRead);
 end;
 
+function IsReadableProtect(Protect: DWORD): Boolean;
+begin
+  // readable and not guarded/no access
+  Result := ((Protect and PAGE_GUARD)=0) and ((Protect and PAGE_NOACCESS)=0) and
+            ((Protect and PAGE_READONLY)<>0 or
+             (Protect and PAGE_READWRITE)<>0 or
+             (Protect and PAGE_WRITECOPY)<>0 or
+             (Protect and PAGE_EXECUTE_READ)<>0 or
+             (Protect and PAGE_EXECUTE_READWRITE)<>0 or
+             (Protect and PAGE_EXECUTE_WRITECOPY)<>0);
+end;
+
+procedure FindPointersToAddress(TargetAddress: PtrUInt; MaxResults: Integer = 50);
+var
+  mbi: MEMORY_BASIC_INFORMATION;
+  scanAddr, regionBase, regionSize, offset: PtrUInt;
+  chunkSize, toRead: NativeUInt;
+  bytesRead: NativeUInt;
+  buf: array of Byte;
+  i: NativeUInt;
+  pval: PtrUInt;
+  found: Integer;
+  moduleName: string;
+begin
+  if ProcessHandle = 0 then
+  begin
+    WriteLn('Error: No process attached');
+    Exit;
+  end;
+
+  WriteLn('');
+  WriteLn(Format('Pointer scan target: $%X', [TargetAddress]));
+  WriteLn('Scanning readable memory pages...');
+
+  found := 0;
+  scanAddr := 0;
+  chunkSize := 65536;
+
+  while (scanAddr < High(PtrUInt)) and
+        (VirtualQueryEx(ProcessHandle, Pointer(scanAddr), mbi, SizeOf(mbi)) = SizeOf(mbi)) do
+  begin
+    regionBase := PtrUInt(mbi.BaseAddress);
+    regionSize := mbi.RegionSize;
+
+    if (mbi.State = MEM_COMMIT) and IsReadableProtect(mbi.Protect) then
+    begin
+      offset := 0;
+      while offset < regionSize do
+      begin
+        toRead := chunkSize;
+        if offset + toRead > regionSize then
+          toRead := regionSize - offset;
+
+        SetLength(buf, toRead);
+        if Windows.ReadProcessMemory(ProcessHandle, Pointer(regionBase + offset), @buf[0], toRead, bytesRead) and
+           (bytesRead >= SizeOf(PtrUInt)) then
+        begin
+          i := 0;
+          while i + SizeOf(PtrUInt) <= bytesRead do
+          begin
+            Move(buf[i], pval, SizeOf(PtrUInt));
+            if pval = TargetAddress then
+            begin
+              Inc(found);
+              moduleName := FindModuleForAddress(regionBase + offset + i);
+              if moduleName <> '' then
+                WriteLn(Format('  [%d] $%X  (%s)', [found, regionBase + offset + i, moduleName]))
+              else
+                WriteLn(Format('  [%d] $%X', [found, regionBase + offset + i]));
+
+              if found >= MaxResults then
+              begin
+                WriteLn(Format('Reached max results (%d). Stop scan.', [MaxResults]));
+                Exit;
+              end;
+            end;
+            Inc(i, SizeOf(PtrUInt));
+          end;
+        end;
+
+        Inc(offset, toRead);
+      end;
+    end;
+
+    if regionBase + regionSize <= scanAddr then
+      Break;
+    scanAddr := regionBase + regionSize;
+  end;
+
+  if found = 0 then
+    WriteLn('No pointer found for this address.')
+  else
+    WriteLn(Format('Found %d candidate pointer(s).', [found]));
+end;
+
 // Write memory
 function WriteMem(Address: PtrUInt; Size: Integer; const Data): Boolean;
 var
@@ -485,6 +580,7 @@ begin
   WriteLn('5. List entries');
   WriteLn('6. Save table');
   WriteLn('7. Auto-reattach test');
+  WriteLn('8. Auto find pointers for an entry');
   WriteLn('0. Exit');
   WriteLn('');
   Write('Choice: ');
@@ -507,6 +603,40 @@ begin
       WriteLn(Format('    Persistence: %s + $%X', [Entry^.ModuleName, Entry^.ModuleOffset]));
   end;
   WriteLn('');
+end;
+
+procedure AutoFindPointersForEntry;
+var
+  idx: Integer;
+  s: string;
+  Entry: PMemEntry;
+  target: PtrUInt;
+begin
+  if Entries.Count = 0 then
+  begin
+    WriteLn('No entries. Add one first.');
+    Exit;
+  end;
+
+  ListEntries;
+  Write('Entry index: ');
+  ReadLn(s);
+  idx := StrToIntDef(s, 0) - 1;
+  if (idx < 0) or (idx >= Entries.Count) then
+  begin
+    WriteLn('Invalid index');
+    Exit;
+  end;
+
+  Entry := PMemEntry(Entries[idx]);
+  target := ResolveAddress(Entry);
+  if target = 0 then
+  begin
+    WriteLn('Target address resolve failed');
+    Exit;
+  end;
+
+  FindPointersToAddress(target, 50);
 end;
 
 procedure TestAutoReattach;
@@ -598,6 +728,8 @@ begin
         end;
         
         7: TestAutoReattach;
+
+        8: AutoFindPointersForEntry;
         
         0: begin
           WriteLn('Bye!');
