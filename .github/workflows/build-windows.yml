@@ -45,7 +45,7 @@ jobs:
         # Build GUI version
         if (Test-Path CEEasyTrainerGUI.lpi) {
           Write-Host "Building GUI version..."
-          & $lazbuild CEEasyTrainerGUI.lpi -B 2>&1
+          & $lazbuild CEEasyTrainerGUI.lpi --cpu=i386 --os=win32 --ws=win32 -B 2>&1
           if ($LASTEXITCODE -eq 0) {
             Write-Host "GUI build SUCCESS"
           } else {
