@@ -11,7 +11,7 @@ uses
   {$IFDEF UNIX}
   cthreads,
   {$ENDIF}
-  SysUtils,
+  SysUtils, Classes,
   SmartPersistenceUnit in 'src/SmartPersistenceUnit.pas',
   AutoReattachUnit in 'src/AutoReattachUnit.pas',
   CTEasyCompatibilityUnit in 'src/CTEasyCompatibilityUnit.pas';
