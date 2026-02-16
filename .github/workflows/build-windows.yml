@@ -16,42 +16,36 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
-    - name: Install FPC (with retry)
+    - name: Install Lazarus (retry)
       shell: powershell
       run: |
         $ok = $false
-        for ($i=1; $i -le 3; $i++) {
-          Write-Host "Install attempt $i ..."
-          choco install fpc -y --no-progress
+        for ($i=1; $i -le 4; $i++) {
+          Write-Host "Install Lazarus attempt $i ..."
+          choco install lazarus -y --no-progress
           if ($LASTEXITCODE -eq 0) { $ok = $true; break }
-          Start-Sleep -Seconds 20
+          Start-Sleep -Seconds (20 * $i)
         }
         if (-not $ok) {
-          Write-Host "Failed to install fpc via choco"
+          Write-Host "Failed to install Lazarus after retries"
           exit 1
         }
 
-    - name: Build with FPC
+    - name: Build with lazbuild
       shell: powershell
       run: |
-        $fpc = (Get-Command fpc -ErrorAction SilentlyContinue).Source
-        if (-not $fpc) {
-          $candidates = @(
-            "C:\\tools\\fpc\\bin\\i386-win32\\fpc.exe",
-            "C:\\tools\\fpc\\bin\\x86_64-win64\\fpc.exe",
-            "C:\\FPC\\3.2.2\\bin\\i386-win32\\fpc.exe",
-            "C:\\FPC\\3.2.2\\bin\\x86_64-win64\\fpc.exe"
-          )
-          foreach ($c in $candidates) { if (Test-Path $c) { $fpc = $c; break } }
+        $lazbuild = "C:\lazarus\lazbuild.exe"
+        if (!(Test-Path $lazbuild)) {
+          $lazbuild = (Get-Command lazbuild -ErrorAction SilentlyContinue).Source
         }
-        if (-not $fpc) {
-          Write-Host "fpc not found"
+        if (!(Test-Path $lazbuild)) {
+          Write-Host "lazbuild not found"
           exit 1
         }
-        Write-Host "Using fpc: $fpc"
+        Write-Host "Using lazbuild: $lazbuild"
 
         New-Item -ItemType Directory -Force -Path bin | Out-Null
-        & $fpc CEEasyTrainer.lpr -Mdelphi -O3 -XX -obin\CEEasyTrainer.exe 2>&1
+        & $lazbuild CEEasyTrainer.lpi -B 2>&1
         if ($LASTEXITCODE -ne 0) {
           Write-Host "Build failed with exit code: $LASTEXITCODE"
           exit 1
