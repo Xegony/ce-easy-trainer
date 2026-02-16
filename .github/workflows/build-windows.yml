@@ -40,7 +40,16 @@ jobs:
     - name: Build
       shell: powershell
       run: |
-        & lazbuild CheatEngineEasyTrainer.lpi -B 2>&1
+        $lazbuild = "C:\lazarus\lazbuild.exe"
+        if (!(Test-Path $lazbuild)) {
+          $lazbuild = (Get-Command lazbuild -ErrorAction SilentlyContinue).Source
+        }
+        if (!(Test-Path $lazbuild)) {
+          Write-Host "lazbuild not found"
+          exit 1
+        }
+        Write-Host "Using lazbuild: $lazbuild"
+        & $lazbuild CheatEngineEasyTrainer.lpi -B 2>&1
         if ($LASTEXITCODE -ne 0) {
           Write-Host "Build failed with exit code: $LASTEXITCODE"
           exit 1
