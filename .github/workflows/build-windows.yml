@@ -11,30 +11,52 @@ on:
 jobs:
   build-windows:
     runs-on: windows-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
-    - name: Install Lazarus
+
+    - name: Install FPC (with retry)
       shell: powershell
       run: |
-        choco install lazarus -y
-        
-    - name: Build
-      shell: powershell
-      run: |
-        $lazbuild = "C:\lazarus\lazbuild.exe"
-        if (!(Test-Path $lazbuild)) {
-          $lazbuild = (Get-Command lazbuild -ErrorAction SilentlyContinue).Source
+        $ok = $false
+        for ($i=1; $i -le 3; $i++) {
+          Write-Host "Install attempt $i ..."
+          choco install fpc -y --no-progress
+          if ($LASTEXITCODE -eq 0) { $ok = $true; break }
+          Start-Sleep -Seconds 20
         }
-        Write-Host "Using lazbuild: $lazbuild"
-        & $lazbuild CEEasyTrainer.lpi -B 2>&1
+        if (-not $ok) {
+          Write-Host "Failed to install fpc via choco"
+          exit 1
+        }
+
+    - name: Build with FPC
+      shell: powershell
+      run: |
+        $fpc = (Get-Command fpc -ErrorAction SilentlyContinue).Source
+        if (-not $fpc) {
+          $candidates = @(
+            "C:\\tools\\fpc\\bin\\i386-win32\\fpc.exe",
+            "C:\\tools\\fpc\\bin\\x86_64-win64\\fpc.exe",
+            "C:\\FPC\\3.2.2\\bin\\i386-win32\\fpc.exe",
+            "C:\\FPC\\3.2.2\\bin\\x86_64-win64\\fpc.exe"
+          )
+          foreach ($c in $candidates) { if (Test-Path $c) { $fpc = $c; break } }
+        }
+        if (-not $fpc) {
+          Write-Host "fpc not found"
+          exit 1
+        }
+        Write-Host "Using fpc: $fpc"
+
+        New-Item -ItemType Directory -Force -Path bin | Out-Null
+        & $fpc CEEasyTrainer.lpr -Mdelphi -O3 -XX -obin\CEEasyTrainer.exe 2>&1
         if ($LASTEXITCODE -ne 0) {
           Write-Host "Build failed with exit code: $LASTEXITCODE"
           exit 1
         }
-        
+
     - name: Verify build
       shell: powershell
       run: |
@@ -45,20 +67,20 @@ jobs:
           Write-Host "Build FAILED - exe not found"
           exit 1
         }
-        
+
     - name: Package release
       shell: powershell
       run: |
-        New-Item -ItemType Directory -Force -Path release
+        New-Item -ItemType Directory -Force -Path release | Out-Null
         Copy-Item bin\CEEasyTrainer.exe release\
         Copy-Item README.md release\ -ErrorAction SilentlyContinue
-        
+
     - name: Create artifact
       uses: actions/upload-artifact@v4
       with:
         name: CE-Easy-Trainer-Windows
         path: release/
-        
+
     - name: Create release
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
