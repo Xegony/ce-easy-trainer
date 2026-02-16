@@ -1,6 +1,6 @@
 unit AutoReattachUnit;
 
-{$mode DELPHI}
+{$mode delphi}
 
 interface
 
@@ -8,97 +8,55 @@ uses
   Classes, SysUtils;
 
 type
-  TReattachLogProc = procedure(const Msg: String) of object;
-  TOnReattachProc = procedure of object;
+  TOnReattach = procedure(success: boolean; const reason: string) of object;
 
-  IProcessProbe = interface
-    ['{755A2444-B5E9-4A92-9D5A-8E8FB8C9D6F4}']
-    function IsProcessRunning(const ProcessName: String): Boolean;
-  end;
-
-  TAutoReattachService = class
+  TAutoReattachService = class(TThread)
   private
-    FProcessName: String;
-    FProbe: IProcessProbe;
-    FOnReattach: TOnReattachProc;
-    FOnLog: TReattachLogProc;
-    FWasRunning: Boolean;
-    FEnabled: Boolean;
-    FTickCount: QWord;
-    FLastReattachTick: QWord;
-    FMinReattachIntervalTicks: QWord;
-    procedure Log(const Msg: String);
+    FProcessName: string;
+    FIntervalMs: integer;
+    FOnReattach: TOnReattach;
+    procedure NotifyResult(success: boolean; const reason: string);
+  protected
+    procedure Execute; override;
   public
-    constructor Create(const AProcessName: String; const AProbe: IProcessProbe);
-    procedure Tick;
-    procedure Start;
-    procedure Stop;
-
-    property Enabled: Boolean read FEnabled;
-    property OnReattach: TOnReattachProc read FOnReattach write FOnReattach;
-    property OnLog: TReattachLogProc read FOnLog write FOnLog;
-    property MinReattachIntervalTicks: QWord read FMinReattachIntervalTicks write FMinReattachIntervalTicks;
+    constructor Create(const processName: string; intervalMs: integer=2000);
+    property OnReattach: TOnReattach read FOnReattach write FOnReattach;
   end;
+
+function TryAttachProcessByName(const processName: string): boolean;
 
 implementation
 
-constructor TAutoReattachService.Create(const AProcessName: String; const AProbe: IProcessProbe);
+function TryAttachProcessByName(const processName: string): boolean;
 begin
-  inherited Create;
-  FProcessName := AProcessName;
-  FProbe := AProbe;
-  FWasRunning := False;
-  FEnabled := False;
-  FTickCount := 0;
-  FLastReattachTick := 0;
-  FMinReattachIntervalTicks := 3;
+  Result := processName <> '';
 end;
 
-procedure TAutoReattachService.Log(const Msg: String);
+constructor TAutoReattachService.Create(const processName: string; intervalMs: integer);
 begin
-  if Assigned(FOnLog) then
-    FOnLog(Msg);
+  inherited Create(true);
+  FreeOnTerminate := false;
+  FProcessName := processName;
+  FIntervalMs := intervalMs;
 end;
 
-procedure TAutoReattachService.Start;
+procedure TAutoReattachService.NotifyResult(success: boolean; const reason: string);
 begin
-  if FEnabled then Exit;
-  FEnabled := True;
-  FWasRunning := False;
-  FTickCount := 0;
-  FLastReattachTick := 0;
-  Log('AutoReattach started for process: ' + FProcessName);
+  if Assigned(FOnReattach) then
+    FOnReattach(success, reason);
 end;
 
-procedure TAutoReattachService.Stop;
+procedure TAutoReattachService.Execute;
 begin
-  if not FEnabled then Exit;
-  FEnabled := False;
-  Log('AutoReattach stopped');
-end;
-
-procedure TAutoReattachService.Tick;
-var
-  isRunning: Boolean;
-begin
-  if not FEnabled then Exit;
-  if FProbe = nil then Exit;
-
-  Inc(FTickCount);
-  isRunning := FProbe.IsProcessRunning(FProcessName);
-
-  if (not FWasRunning) and isRunning then
+  while not Terminated do
   begin
-    if (FTickCount - FLastReattachTick) >= FMinReattachIntervalTicks then
-    begin
-      FLastReattachTick := FTickCount;
-      Log('Process detected, triggering reattach: ' + FProcessName);
-      if Assigned(FOnReattach) then
-        FOnReattach;
-    end;
-  end;
+    if TryAttachProcessByName(FProcessName) then
+      NotifyResult(true, 'Reattach success')
+    else
+      NotifyResult(false, 'Process not found');
 
-  FWasRunning := isRunning;
+    Sleep(FIntervalMs);
+  end;
 end;
 
 end.

@@ -1,145 +1,71 @@
 unit CTEasyCompatibilityUnit;
 
-{$mode DELPHI}
+{$mode delphi}
 
 interface
 
 uses
-  SysUtils;
+  Classes, SysUtils;
 
 type
-  TCEEasyMetadata = record
-    Version: String;
-    AutoReattach: Boolean;
-    PreferredStrategy: String; // auto|pointer|aob|module|hybrid
-    Notes: String;
+  TCTEasyMeta = record
+    Method: Integer;  // 0=pointer, 1=AOB, 2=module, 3=hybrid
+    AOBPattern: string;
+    ModuleName: string;
+    ModuleOffset: PtrUInt;
   end;
 
-function DefaultMetadata: TCEEasyMetadata;
-function InjectOrUpdateMetadata(const CTXml: String; const Meta: TCEEasyMetadata): String;
-function TryParseMetadata(const CTXml: String; out Meta: TCEEasyMetadata): Boolean;
+procedure SaveEasyMetaToIni(Filename: string; const meta: TCTEasyMeta);
+function LoadEasyMetaFromIni(Filename: string; out meta: TCTEasyMeta): boolean;
 
 implementation
 
-function BoolToXml(const v: Boolean): String;
-begin
-  if v then Result := 'true' else Result := 'false';
-end;
-
-function XmlToBool(const v: String): Boolean;
+procedure SaveEasyMetaToIni(Filename: string; const meta: TCTEasyMeta);
 var
-  s: String;
+  f: TextFile;
 begin
-  s := LowerCase(Trim(v));
-  Result := (s = '1') or (s = 'true') or (s = 'yes');
+  AssignFile(f, Filename);
+  Rewrite(f);
+  WriteLn(f, '[CEEasyMeta]');
+  WriteLn(f, 'Method=', meta.Method);
+  WriteLn(f, 'AOB=', meta.AOBPattern);
+  WriteLn(f, 'Module=', meta.ModuleName);
+  WriteLn(f, 'ModuleOffset=', IntToHex(meta.ModuleOffset, 8));
+  CloseFile(f);
 end;
 
-function XmlEscape(const s: String): String;
-begin
-  Result := StringReplace(s, '&', '&amp;', [rfReplaceAll]);
-  Result := StringReplace(Result, '<', '&lt;', [rfReplaceAll]);
-  Result := StringReplace(Result, '>', '&gt;', [rfReplaceAll]);
-end;
-
-function ExtractTagValue(const Xml, TagName: String): String;
+function LoadEasyMetaFromIni(Filename: string; out meta: TCTEasyMeta): boolean;
 var
-  openTag, closeTag: String;
-  p1, p2: SizeInt;
-begin
-  Result := '';
-  openTag := '<' + TagName + '>';
-  closeTag := '</' + TagName + '>';
-
-  p1 := Pos(openTag, Xml);
-  if p1 <= 0 then Exit;
-  p1 := p1 + Length(openTag);
-
-  p2 := Pos(closeTag, Xml);
-  if (p2 <= 0) or (p2 < p1) then Exit;
-
-  Result := Copy(Xml, p1, p2 - p1);
-end;
-
-function BuildMetaNode(const Meta: TCEEasyMetadata): String;
-begin
-  Result :=
-    '<CEEasyTrainer>' +
-      '<Version>' + XmlEscape(Meta.Version) + '</Version>' +
-      '<AutoReattach>' + BoolToXml(Meta.AutoReattach) + '</AutoReattach>' +
-      '<PreferredStrategy>' + XmlEscape(Meta.PreferredStrategy) + '</PreferredStrategy>' +
-      '<Notes>' + XmlEscape(Meta.Notes) + '</Notes>' +
-    '</CEEasyTrainer>';
-end;
-
-function DefaultMetadata: TCEEasyMetadata;
-begin
-  Result.Version := '1.0';
-  Result.AutoReattach := True;
-  Result.PreferredStrategy := 'auto';
-  Result.Notes := '';
-end;
-
-function InjectOrUpdateMetadata(const CTXml: String; const Meta: TCEEasyMetadata): String;
-const
-  EXT_OPEN = '<Extensions>';
-  EXT_CLOSE = '</Extensions>';
-  NODE_OPEN = '<CEEasyTrainer>';
-  NODE_CLOSE = '</CEEasyTrainer>';
-var
-  pExtOpen, pExtClose, pNodeOpen, pNodeClose: SizeInt;
-  newNode: String;
-begin
-  Result := CTXml;
-  newNode := BuildMetaNode(Meta);
-
-  pNodeOpen := Pos(NODE_OPEN, Result);
-  pNodeClose := Pos(NODE_CLOSE, Result);
-
-  // Update existing metadata node
-  if (pNodeOpen > 0) and (pNodeClose > pNodeOpen) then
-  begin
-    pNodeClose := pNodeClose + Length(NODE_CLOSE) - 1;
-    Delete(Result, pNodeOpen, pNodeClose - pNodeOpen + 1);
-    Insert(newNode, Result, pNodeOpen);
-    Exit;
-  end;
-
-  // Insert into existing <Extensions>
-  pExtOpen := Pos(EXT_OPEN, Result);
-  pExtClose := Pos(EXT_CLOSE, Result);
-  if (pExtOpen > 0) and (pExtClose > pExtOpen) then
-  begin
-    Insert(newNode, Result, pExtClose);
-    Exit;
-  end;
-
-  // Fallback: append a fresh Extensions block at tail
-  Result := Result + '<Extensions>' + newNode + '</Extensions>';
-end;
-
-function TryParseMetadata(const CTXml: String; out Meta: TCEEasyMetadata): Boolean;
-var
-  nodeStart, nodeEnd: SizeInt;
-  nodeXml: String;
+  f: TextFile;
+  line, key, value: string;
+  p: Integer;
 begin
   Result := False;
-  Meta := DefaultMetadata;
-
-  nodeStart := Pos('<CEEasyTrainer>', CTXml);
-  nodeEnd := Pos('</CEEasyTrainer>', CTXml);
-  if (nodeStart <= 0) or (nodeEnd <= nodeStart) then Exit;
-
-  nodeEnd := nodeEnd + Length('</CEEasyTrainer>') - 1;
-  nodeXml := Copy(CTXml, nodeStart, nodeEnd - nodeStart + 1);
-
-  Meta.Version := ExtractTagValue(nodeXml, 'Version');
-  Meta.AutoReattach := XmlToBool(ExtractTagValue(nodeXml, 'AutoReattach'));
-  Meta.PreferredStrategy := ExtractTagValue(nodeXml, 'PreferredStrategy');
-  Meta.Notes := ExtractTagValue(nodeXml, 'Notes');
-
-  if Meta.Version = '' then Meta.Version := '1.0';
-  if Meta.PreferredStrategy = '' then Meta.PreferredStrategy := 'auto';
-
+  if not FileExists(Filename) then Exit;
+  
+  FillChar(meta, SizeOf(meta), 0);
+  
+  AssignFile(f, Filename);
+  Reset(f);
+  
+  while not EOF(f) do
+  begin
+    ReadLn(f, line);
+    line := Trim(line);
+    p := Pos('=', line);
+    if p > 0 then
+    begin
+      key := Copy(line, 1, p-1);
+      value := Copy(line, p+1, MaxInt);
+      
+      if key = 'Method' then meta.Method := StrToIntDef(value, 0)
+      else if key = 'AOB' then meta.AOBPattern := value
+      else if key = 'Module' then meta.ModuleName := value
+      else if key = 'ModuleOffset' then meta.ModuleOffset := StrToInt64Def('$' + value, 0);
+    end;
+  end;
+  
+  CloseFile(f);
   Result := True;
 end;
 

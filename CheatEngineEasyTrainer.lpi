@@ -13,10 +13,6 @@
       <Title Value="CE Easy Trainer"/>
       <Scaled Value="True"/>
       <ResourceType Value="res"/>
-      <UseXPManifest Value="True"/>
-      <XPManifest>
-        <DpiAware Value="True"/>
-      </XPManifest>
     </General>
     <BuildModes>
       <Item Name="Default" Default="True"/>
@@ -34,19 +30,15 @@
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="cheat-engine/Cheat Engine/SmartPersistenceUnit.pas"/>
+        <Filename Value="src/SmartPersistenceUnit.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="cheat-engine/Cheat Engine/EasyTrainerMainUnit.pas"/>
+        <Filename Value="src/AutoReattachUnit.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
       <Unit>
-        <Filename Value="cheat-engine/Cheat Engine/AutoReattachUnit.pas"/>
-        <IsPartOfProject Value="True"/>
-      </Unit>
-      <Unit>
-        <Filename Value="cheat-engine/Cheat Engine/CTEasyCompatibilityUnit.pas"/>
+        <Filename Value="src/CTEasyCompatibilityUnit.pas"/>
         <IsPartOfProject Value="True"/>
       </Unit>
     </Units>
@@ -59,7 +51,7 @@
     </Target>
     <SearchPaths>
       <IncludeFiles Value="$(ProjOutDir)"/>
-      <OtherUnitFiles Value="cheat-engine/Cheat Engine"/>
+      <OtherUnitFiles Value="src"/>
       <UnitOutputDirectory Value="lib/$(TargetCPU)-$(TargetOS)"/>
     </SearchPaths>
     <Parsing>
