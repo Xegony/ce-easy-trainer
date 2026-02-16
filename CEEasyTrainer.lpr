@@ -264,15 +264,15 @@ begin
 end;
 
 function IsReadableProtect(Protect: DWORD): Boolean;
+const
+  READ_MASK = PAGE_READONLY or PAGE_READWRITE or PAGE_WRITECOPY or
+              PAGE_EXECUTE_READ or PAGE_EXECUTE_READWRITE or PAGE_EXECUTE_WRITECOPY;
 begin
-  // readable and not guarded/no access
-  Result := ((Protect and PAGE_GUARD)=0) and ((Protect and PAGE_NOACCESS)=0) and
-            ((Protect and PAGE_READONLY)<>0 or
-             (Protect and PAGE_READWRITE)<>0 or
-             (Protect and PAGE_WRITECOPY)<>0 or
-             (Protect and PAGE_EXECUTE_READ)<>0 or
-             (Protect and PAGE_EXECUTE_READWRITE)<>0 or
-             (Protect and PAGE_EXECUTE_WRITECOPY)<>0);
+  Result := False;
+  if (Protect and PAGE_GUARD) <> 0 then Exit;
+  if (Protect and PAGE_NOACCESS) <> 0 then Exit;
+  if (Protect and READ_MASK) <> 0 then
+    Result := True;
 end;
 
 procedure FindPointersToAddress(TargetAddress: PtrUInt; MaxResults: Integer = 50);
